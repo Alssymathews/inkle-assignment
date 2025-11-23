@@ -27,8 +27,7 @@ function formatDate(dateString) {
   if (parts.length === 3) {
     let [day, month, year] = parts;
     if (year.length === 2) year = "20" + year;
-    const iso = `${year}-${month}-${day}`;
-    const d2 = new Date(iso);
+    const d2 = new Date(`${year}-${month}-${day}`);
     if (!isNaN(d2.getTime())) {
       return d2.toLocaleDateString("en-US", {
         month: "short",
@@ -50,18 +49,13 @@ function App() {
   const [showCountryFilter, setShowCountryFilter] = useState(false);
   const [selectedCountries, setSelectedCountries] = useState([]);
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
-  const [dropdownPos, setDropdownPos] = useState({
-    top: 0,
-    left: 0,
-    width: 0,
-  });
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
   const [dropdownSearchTerm, setDropdownSearchTerm] = useState("");
 
   const countryFieldRef = useRef(null);
 
   useEffect(() => {
     async function load() {
-      setLoading(true);
       const [tRes, cRes] = await Promise.all([
         axios.get(TAXES_API),
         axios.get(COUNTRIES_API),
@@ -74,16 +68,24 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const closeAll = () => {
-      setShowCountryFilter(false);
-      setShowCountryDropdown(false);
-      setDropdownSearchTerm("");
-    };
-    if (showCountryFilter || showCountryDropdown) {
-      window.addEventListener("click", closeAll);
+    function handleClick(e) {
+      const wrapper = document.querySelector(".country-select-wrapper");
+      const pop = document.querySelector(".country-list-popover");
+      const filter = document.querySelector(".country-filter-popover");
+
+      if (wrapper && !wrapper.contains(e.target)) {
+        setShowCountryDropdown(false);
+        setDropdownSearchTerm("");
+      }
+
+      if (filter && !filter.contains(e.target)) {
+        setShowCountryFilter(false);
+      }
     }
-    return () => window.removeEventListener("click", closeAll);
-  }, [showCountryFilter, showCountryDropdown]);
+
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, []);
 
   const countriesByName = useMemo(() => {
     const map = {};
@@ -156,9 +158,7 @@ function App() {
 
   function toggleCountry(name) {
     setSelectedCountries((prev) =>
-      prev.includes(name)
-        ? prev.filter((c) => c !== name)
-        : [...prev, name]
+      prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]
     );
   }
 
@@ -260,18 +260,16 @@ function App() {
                 className="country-filter-popover"
                 onClick={(e) => e.stopPropagation()}
               >
-                {Array.from(new Set(taxes.map((t) => t.country))).map(
-                  (c) => (
-                    <label key={c} className="filter-row">
-                      <input
-                        type="checkbox"
-                        checked={selectedCountries.includes(c)}
-                        onChange={() => toggleCountry(c)}
-                      />
-                      {c}
-                    </label>
-                  )
-                )}
+                {Array.from(new Set(taxes.map((t) => t.country))).map((c) => (
+                  <label key={c} className="filter-row">
+                    <input
+                      type="checkbox"
+                      checked={selectedCountries.includes(c)}
+                      onChange={() => toggleCountry(c)}
+                    />
+                    {c}
+                  </label>
+                ))}
               </div>
             )}
           </div>
@@ -280,12 +278,7 @@ function App() {
 
       {editRow && (
         <div className="modal-backdrop">
-          <div
-            className="modal"
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-          >
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
             <header className="modal-header">
               <h2>Edit Customer</h2>
               <button className="close-btn" onClick={handleClose}>
@@ -375,9 +368,7 @@ function App() {
               return (
                 <div
                   key={c.id}
-                  className={
-                    "country-list-row" + (isSelected ? " selected" : "")
-                  }
+                  className={"country-list-row" + (isSelected ? " selected" : "")}
                   onClick={() => handleSelectCountry(c.name)}
                 >
                   <span className="country-list-icon">
