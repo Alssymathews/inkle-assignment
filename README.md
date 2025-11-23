@@ -33,8 +33,8 @@ Countries API
 https://685013d7e7c42cfd17974a33.mockapi.io/countries
 
 Tech Stack:-
-React (Vite)
-@tanstack/react-table
-Axios
-Custom CSS
-Vercel for deployment
+React (Vite),
+@tanstack/react-table,
+Axios,
+Custom CSS,
+Vercel for deployment.
