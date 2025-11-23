@@ -47,14 +47,17 @@ function App() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [editRow, setEditRow] = useState(null);
+
   const [showCountryFilter, setShowCountryFilter] = useState(false);
   const [selectedCountries, setSelectedCountries] = useState([]);
+
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
   const [dropdownSearchTerm, setDropdownSearchTerm] = useState("");
 
   const countryFieldRef = useRef(null);
   const modalRef = useRef(null);
+  const filterRef = useRef(null);
 
   useEffect(() => {
     async function load() {
@@ -71,31 +74,18 @@ function App() {
   }, []);
 
   useEffect(() => {
-    function handleClick(e) {
-      const filterBox = document.querySelector(".country-filter-popover");
-      const dropdownBox = document.querySelector(".country-list-popover");
-      const field = countryFieldRef.current;
-
-      if (showCountryFilter && filterBox && !filterBox.contains(e.target)) {
+    const closeAll = (e) => {
+      if (
+        filterRef.current &&
+        !filterRef.current.contains(e.target)
+      ) {
         setShowCountryFilter(false);
       }
-
-      if (showCountryDropdown) {
-        if (
-          dropdownBox &&
-          !dropdownBox.contains(e.target) &&
-          field &&
-          !field.contains(e.target)
-        ) {
-          setShowCountryDropdown(false);
-          setDropdownSearchTerm("");
-        }
-      }
-    }
-
-    document.addEventListener("click", handleClick);
-    return () => document.removeEventListener("click", handleClick);
-  }, [showCountryFilter, showCountryDropdown]);
+      setShowCountryDropdown(false);
+    };
+    window.addEventListener("click", closeAll);
+    return () => window.removeEventListener("click", closeAll);
+  }, []);
 
   const countriesByName = useMemo(() => {
     const map = {};
@@ -103,68 +93,29 @@ function App() {
     return map;
   }, [countries]);
 
+  const tableCountries = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          taxes
+            .map((t) => t.country)
+            .filter((c) => c && c.trim() !== "")
+        )
+      ),
+    [taxes]
+  );
+
   const filteredTaxes = useMemo(() => {
     if (!selectedCountries.length) return taxes;
-    return taxes.filter((t) => selectedCountries.includes(t.country || ""));
+    return taxes.filter((t) => selectedCountries.includes(t.country));
   }, [selectedCountries, taxes]);
 
   const filteredCountryOptions = useMemo(() => {
     if (!dropdownSearchTerm.trim()) return countries;
-    const term = dropdownSearchTerm.toLowerCase();
-    return countries.filter((c) => c.name.toLowerCase().includes(term));
+    return countries.filter((c) =>
+      c.name.toLowerCase().includes(dropdownSearchTerm.toLowerCase())
+    );
   }, [countries, dropdownSearchTerm]);
-
-  const columns = useMemo(
-    () => [
-      columnHelper.accessor("name", {
-        header: "Entity",
-        cell: (info) => (
-          <button className="entity-link">{info.getValue() || "-"}</button>
-        ),
-      }),
-      columnHelper.accessor("gender", {
-        header: "Gender",
-        cell: (info) => <GenderBadge gender={info.getValue()} />,
-      }),
-      columnHelper.accessor("requestDate", {
-        header: "Request Date",
-        cell: (info) => formatDate(info.getValue()),
-      }),
-      columnHelper.accessor("country", {
-        header: () => (
-          <div className="country-header">
-            Country
-            <button
-              className="filter-icon-button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowCountryFilter((prev) => !prev);
-              }}
-            >
-              ⏷
-            </button>
-          </div>
-        ),
-        cell: (info) => info.getValue() || "-",
-      }),
-      {
-        id: "actions",
-        header: "",
-        cell: ({ row }) => (
-          <button className="edit-icon" onClick={() => setEditRow(row.original)}>
-            ✏️
-          </button>
-        ),
-      },
-    ],
-    [showCountryFilter]
-  );
-
-  const table = useReactTable({
-    data: filteredTaxes,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-  });
 
   function toggleCountry(name) {
     setSelectedCountries((prev) =>
@@ -174,11 +125,23 @@ function App() {
     );
   }
 
-  function handleClose() {
-    setEditRow(null);
-    setError("");
+  function handleCountryFieldClick(e) {
+    e.stopPropagation();
+    setShowCountryDropdown((prev) => !prev);
+
+    const modalRect = modalRef.current.getBoundingClientRect();
+    const fieldRect = countryFieldRef.current.getBoundingClientRect();
+
+    setDropdownPos({
+      top: fieldRect.bottom - modalRect.top + 6,
+      left: fieldRect.left - modalRect.left,
+      width: fieldRect.width,
+    });
+  }
+
+  function handleSelectCountry(name) {
+    setEditRow((prev) => ({ ...prev, country: name }));
     setShowCountryDropdown(false);
-    setDropdownSearchTerm("");
   }
 
   function handleChange(field, value) {
@@ -204,27 +167,55 @@ function App() {
       prev.map((t) => (t.id === editRow.id ? res.data : t))
     );
     setSaving(false);
-    handleClose();
+    setEditRow(null);
   }
 
-  function handleCountryFieldClick(e) {
-    e.stopPropagation();
-    setShowCountryDropdown((prev) => !prev);
-
-    const modalRect = modalRef.current.getBoundingClientRect();
-    const fieldRect = countryFieldRef.current.getBoundingClientRect();
-
-    setDropdownPos({
-      top: fieldRect.bottom - modalRect.top + 6,
-      left: fieldRect.left - modalRect.left,
-      width: fieldRect.width,
-    });
-  }
-
-  function handleSelectCountry(name) {
-    handleChange("country", name);
-    setShowCountryDropdown(false);
-  }
+  const table = useReactTable({
+    data: filteredTaxes,
+    columns: [
+      columnHelper.accessor("name", {
+        header: "Entity",
+        cell: (info) => (
+          <button className="entity-link">{info.getValue() || "-"}</button>
+        ),
+      }),
+      columnHelper.accessor("gender", {
+        header: "Gender",
+        cell: (info) => <GenderBadge gender={info.getValue()} />,
+      }),
+      columnHelper.accessor("requestDate", {
+        header: "Request Date",
+        cell: (info) => formatDate(info.getValue()),
+      }),
+      columnHelper.accessor("country", {
+        header: () => (
+          <div className="country-header" ref={filterRef}>
+            Country
+            <button
+              className="filter-icon-button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowCountryFilter((p) => !p);
+              }}
+            >
+              ⏷
+            </button>
+          </div>
+        ),
+        cell: (info) => info.getValue() || "-",
+      }),
+      {
+        id: "actions",
+        header: "",
+        cell: ({ row }) => (
+          <button className="edit-icon" onClick={() => setEditRow(row.original)}>
+            ✏️
+          </button>
+        ),
+      },
+    ],
+    getCoreRowModel: getCoreRowModel(),
+  });
 
   return (
     <div className="page-root">
@@ -244,25 +235,18 @@ function App() {
                   <tr key={hg.id}>
                     {hg.headers.map((h) => (
                       <th key={h.id}>
-                        {flexRender(
-                          h.column.columnDef.header,
-                          h.getContext()
-                        )}
+                        {flexRender(h.column.columnDef.header, h.getContext())}
                       </th>
                     ))}
                   </tr>
                 ))}
               </thead>
-
               <tbody>
                 {table.getRowModel().rows.map((row) => (
                   <tr key={row.id}>
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id}>
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
                   </tr>
@@ -271,20 +255,19 @@ function App() {
             </table>
 
             {showCountryFilter && (
-              <div
-                className="country-filter-popover"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {countries.map((c) => (
-                  <label key={c.id} className="filter-row">
-                    <input
-                      type="checkbox"
-                      checked={selectedCountries.includes(c.name)}
-                      onChange={() => toggleCountry(c.name)}
-                    />
-                    {c.name}
-                  </label>
-                ))}
+              <div className="country-filter-popover" ref={filterRef}>
+                <div className="country-grid">
+                  {tableCountries.map((c) => (
+                    <label key={c} className="filter-row">
+                      <input
+                        type="checkbox"
+                        checked={selectedCountries.includes(c)}
+                        onChange={() => toggleCountry(c)}
+                      />
+                      {c}
+                    </label>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -293,14 +276,10 @@ function App() {
 
       {editRow && (
         <div className="modal-backdrop">
-          <div
-            className="modal"
-            ref={modalRef}
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="modal" ref={modalRef} onClick={(e) => e.stopPropagation()}>
             <header className="modal-header">
               <h2>Edit Customer</h2>
-              <button className="close-btn" onClick={handleClose}>
+              <button className="close-btn" onClick={() => setEditRow(null)}>
                 ✕
               </button>
             </header>
@@ -329,9 +308,7 @@ function App() {
                     }
                     onClick={handleCountryFieldClick}
                   >
-                    <span className="country-select-value">
-                      {editRow.country || ""}
-                    </span>
+                    <span className="country-select-value">{editRow.country}</span>
                     <span className="country-select-chevron">▾</span>
                   </div>
                 </div>
@@ -341,7 +318,7 @@ function App() {
             </div>
 
             <footer className="modal-footer">
-              <button className="cancel-btn" onClick={handleClose}>
+              <button className="cancel-btn" onClick={() => setEditRow(null)}>
                 Cancel
               </button>
               <button
@@ -349,7 +326,7 @@ function App() {
                 disabled={saving}
                 onClick={handleSave}
               >
-                {saving ? "Saving..." : "Save"}
+                {saving ? "Saving…" : "Save"}
               </button>
             </footer>
 
@@ -363,46 +340,19 @@ function App() {
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="country-search-wrapper">
-                  <input
-                    className="country-search-input"
-                    placeholder="Search country..."
-                    value={dropdownSearchTerm}
-                    onChange={(e) => setDropdownSearchTerm(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </div>
-
                 <div className="country-list-scroll">
-                  {filteredCountryOptions.length === 0 && (
-                    <div className="country-empty">No countries found</div>
-                  )}
-
-                  {filteredCountryOptions.map((c) => {
-                    const isSelected =
-                      editRow && editRow.country && editRow.country === c.name;
-                    return (
-                      <div
-                        key={c.id}
-                        className={
-                          "country-list-row" + (isSelected ? " selected" : "")
-                        }
-                        onClick={() => handleSelectCountry(c.name)}
-                      >
-                        <span className="country-list-icon">
-                          <svg viewBox="0 0 24 24" className="icon-svg">
-                            <path d="M12 2C8.686 2 6 4.686 6 8c0 4.077 4.395 9.36 5.597 10.735.213.24.593.24.806 0C13.605 17.36 18 12.077 18 8c0-3.314-2.686-6-6-6zm0 8.5A2.5 2.5 0 1 1 12 5.5a2.5 2.5 0 0 1 0 5z" />
-                          </svg>
-                        </span>
-                        <span className="country-list-name">{c.name}</span>
-                        <span className="country-list-edit-icon">
-                          <svg viewBox="0 0 24 24" className="icon-svg">
-                            <path d="M4 17.25V20h2.75L17.81 8.94l-2.75-2.75L4 17.25zm14.71-9.46a1 1 0 0 0 0-1.41l-1.59-1.59a1 1 0 0 0-1.41 0l-1.13 1.13 2.75 2.75 1.38-1.38z" />
-                          </svg>
-                        </span>
-                      </div>
-                    );
-                  })}
+                  {filteredCountryOptions.map((c) => (
+                    <div
+                      key={c.id}
+                      className={
+                        "country-list-row" +
+                        (editRow.country === c.name ? " selected" : "")
+                      }
+                      onClick={() => handleSelectCountry(c.name)}
+                    >
+                      <span className="country-list-name">{c.name}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
