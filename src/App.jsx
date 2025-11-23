@@ -71,15 +71,30 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const closeAll = () => {
-      setShowCountryFilter(false);
-      setShowCountryDropdown(false);
-      setDropdownSearchTerm("");
-    };
-    if (showCountryFilter || showCountryDropdown) {
-      window.addEventListener("click", closeAll);
+    function handleClick(e) {
+      const filterBox = document.querySelector(".country-filter-popover");
+      const dropdownBox = document.querySelector(".country-list-popover");
+      const field = countryFieldRef.current;
+
+      if (showCountryFilter && filterBox && !filterBox.contains(e.target)) {
+        setShowCountryFilter(false);
+      }
+
+      if (showCountryDropdown) {
+        if (
+          dropdownBox &&
+          !dropdownBox.contains(e.target) &&
+          field &&
+          !field.contains(e.target)
+        ) {
+          setShowCountryDropdown(false);
+          setDropdownSearchTerm("");
+        }
+      }
     }
-    return () => window.removeEventListener("click", closeAll);
+
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
   }, [showCountryFilter, showCountryDropdown]);
 
   const countriesByName = useMemo(() => {
@@ -260,18 +275,16 @@ function App() {
                 className="country-filter-popover"
                 onClick={(e) => e.stopPropagation()}
               >
-                {Array.from(new Set(taxes.map((t) => t.country))).map(
-                  (c) => (
-                    <label key={c} className="filter-row">
-                      <input
-                        type="checkbox"
-                        checked={selectedCountries.includes(c)}
-                        onChange={() => toggleCountry(c)}
-                      />
-                      {c}
-                    </label>
-                  )
-                )}
+                {countries.map((c) => (
+                  <label key={c.id} className="filter-row">
+                    <input
+                      type="checkbox"
+                      checked={selectedCountries.includes(c.name)}
+                      onChange={() => toggleCountry(c.name)}
+                    />
+                    {c.name}
+                  </label>
+                ))}
               </div>
             )}
           </div>
